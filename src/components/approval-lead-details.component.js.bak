@@ -1,0 +1,1398 @@
+import React, { Component } from "react";
+import { connect } from "react-redux";
+import Helmet from "react-helmet"; 
+import Sidebar from "../common/sidebar";
+import { Redirect } from "react-router-dom";
+import { Modal, Button, Form } from "react-bootstrap"
+import { getLeadProfile, getAddress, getLeadOtherDocuemnt, getLeadPanDocuemnt, getLeadProfileDocuemnt, getLenderLeadDetails} from "../actions/users";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import {  CircularProgressbar,
+  CircularProgressbarWithChildren,
+  buildStyles } from 'react-circular-progressbar';
+import 'react-circular-progressbar/dist/styles.css';
+import jsPDF from 'jspdf'
+import 'jspdf-autotable'
+import html2canvas from 'html2canvas';
+
+const percentage = 60
+
+class LeadDetails extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      bankSrc: '',
+      maxRequestLength: "5242880",
+      company_name: '',
+      monthly_income: '',
+      gmapsLoaded: false,
+      isValidPan: true,
+      errorMsg: '',
+      onBoarding: 0,
+      rent_amount:'',
+      approve_model: false,
+      decline_model: false,
+      approved_model: false,
+      house: 0,
+      isBackUploading: false,
+      isSuccess: '',
+      successMsg: '',
+      isProfileSuccess: '',
+      profileSuccessMsg: '',
+      pan: null, // "ABCTY1234D",
+      firstname: '',
+      lastname: '',
+      userstatus: 'PENDING',
+      sfid: '',
+      product: 'Macbook Pro 2021 Silver Notebook',
+      email: '',
+      mobile: '',
+      card: '',
+      loan_amount: '',
+      profileId: null,
+      panId: null,
+      frontId: null,
+      backId: null,
+      limit: 0,
+      dob: '', //new Date
+      gender: '',
+      pincode: '',
+      address_pin:'',
+      address: '',
+      state: '',
+      city: '',
+      addressList : [],
+      selectedAddress:'',
+      current_address:0,
+      selectedLeadAddress: '',
+      profession: '',
+      selectedTab: 1,
+      defaultTab: 0,
+      profileType: '',
+      profileBase: '',
+      panType: '',
+      panBase: '',
+      frontProofType: '',
+      frontAadharProofBase: '',
+      backAadharProofBase: '',
+      frontDrivingProofBase: '',
+      backDrivingProofBase: '',
+      frontVoterProofBase: '',
+      backVoterProofBase: '',
+      frontPassportProofBase: '',
+      backPassportProofBase: '',
+      backProofType: '',
+      bankDocument: [],
+      selectedPlan:'',
+      frontFileType: 0,
+      backFileType: 0,
+      panFileType: 0,
+      ifsc: '',
+      acc_name:'',
+      acc_no:'',
+      bank:'',
+      resident_type: '',
+      showDocument: '',
+      modalTitle: '',
+      Ifdata:true,
+      net_tenure: '',
+      loan_amount: '',
+      upfront_amount: '',
+      emi_amount: '',
+      loan_startdate: '',
+      interest_rate:'',
+      moratorium_type: '',
+      moratorium_duration:''
+    };
+  }
+
+  componentDidMount() {
+    let opp_data = {
+      opportunity_sfid: this.props.lead_id
+    }
+    this.props.dispatch(getLenderLeadDetails(opp_data)).then((response)=>{
+        if(response.status === "success")
+        {
+          let getData = response.data;
+          let planData = response.data.plan;
+          let gender = getData.gender__c?getData.gender__c.toLowerCase():'';
+          this.setState({
+              firstname: getData.first_name__c,
+              lastname: getData.last_name__c,
+              userstatus: getData.account_status__c?getData.account_status__c:'PENDING',
+              sfid: getData.sfid?getData.sfid:'02398123',
+              product: 'Macbook Pro 2021 Silver Notebook',
+              email: getData.email__c,
+              mobile: getData.phone,
+              pan: getData.pan_number__c,
+              card: 'XXXXXXX76A',
+              dob: getData.date_of_birth_applicant__c,
+              loan_amount: '56,000',
+              pincode: getData.pin_code__c,
+              gender: gender,
+              selectedAddress: getData?getData.current_address:0,
+              rent_amount: getData.rent_amount__c,
+              house: getData.rent_amount__c?2:1,
+              profession: getData.employer_type__c,
+              resident_type: getData.resident_type__c,
+              monthly_income: getData.monthly_income__c?getData.monthly_income__c:'',
+              company_name: getData.employer_name__c?getData.employer_name__c:'',
+              net_tenure: planData.net_tenure__c?planData.net_tenure__c:'',
+              loan_amount: '',
+              upfront_amount: planData.down_payment__c?planData.down_payment__c:'',
+              emi_amount: planData.emi_amount__c?planData.emi_amount__c:'',
+              loan_startdate: planData.first_emi_date__c?planData.first_emi_date__c:'',
+              interest_rate: planData.fixed_rate__c?planData.fixed_rate__c:'',
+              moratorium_type: planData.moratorium_type__c?planData.moratorium_type__c:'',
+              moratorium_duration: planData.moratorium_duration__c?planData.moratorium_duration__c:'',  
+            })
+           this.getLeadProfile(response.data.sfid);
+        }
+    });
+   
+  }
+
+  setDocument = (value,mtitle) =>{
+    this.setState({showDocument:value});
+    this.setState({modalTitle:mtitle});
+  }
+
+  generatePDF = async () => {
+    const pdfData = document.getElementById('content');
+    const canvas = await html2canvas(pdfData);
+    const data = canvas.toDataURL('image/png');
+
+    const pdf = new jsPDF();
+    const imgProperties = pdf.getImageProperties(data);
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight =
+      (imgProperties.height * pdfWidth) / imgProperties.width;
+
+    pdf.addImage(data, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.save('print.pdf');
+  }
+
+  getLeadProfile = (user_sfid) =>{
+    let data = {
+      user_sfid: user_sfid
+    }
+    // this.props.dispatch(getLeadProfile(data)).then((response)=>{
+    //     if(response.status ==="success")
+    //     {
+    //         let getData = response.data;
+    //         let account_profile = getData.account_profile?getData.account_profile:'';
+    //         let gender = getData.gender__c?getData.gender__c.toLowerCase():'';
+    //         this.setState({
+    //             firstname: getData.first_name__c,
+    //             lastname: getData.last_name__c,
+    //             userstatus: getData.account_status__c?getData.account_status__c:'PENDING',
+    //             sfid: getData.sfid?getData.sfid:'02398123',
+    //             product: 'Macbook Pro 2021 Silver Notebook',
+    //             email: getData.email__c,
+    //             mobile: getData.phone,
+    //             pan: getData.pan_number__c,
+    //             card: 'XXXXXXX76A',
+    //             dob: getData.date_of_birth_applicant__c,
+    //             loan_amount: '56,000',
+    //             pincode: getData.pin_code__c,
+    //             gender: gender,
+    //             selectedAddress: account_profile?account_profile.current_address:0,
+    //             rent_amount: getData.rent_amount__c,
+    //             house: getData.rent_amount__c?2:1,
+    //             profession: getData.employer_type__c,
+    //             resident_type: getData.resident_type__c,
+    //             monthly_income: getData.monthly_income__c?getData.monthly_income__c:'',
+    //             company_name: getData.employer_name__c?getData.employer_name__c:''
+    //         })
+    //     }
+    // });
+    
+    this.props.dispatch(getAddress(data)).then((response)=>{
+      if(response.status ==="success")
+      {
+          let getData = response.data;
+          this.setState({
+              addressList: getData,
+          })
+      }
+    });
+    let proData = {
+      sfid: user_sfid,
+      token : this.props.salesForceToken
+    }
+
+    this.props.dispatch(getLeadProfileDocuemnt(proData)).then((response)=>{
+      if(response.status ==="success")
+      {
+          let getData = response.data;
+          if(getData.base64 !==undefined && getData.base64 !=="")
+          {
+              this.setState({
+                  profileBase: "data:image/jpg;base64,"+getData.base64.base64,
+                  profileType: "image/jpg",
+                 // profileId: getData.id
+              });
+          }
+      }
+  });
+
+  this.props.dispatch(getLeadPanDocuemnt(proData)).then((response)=>{
+      if(response.status ==="success")
+      {
+          let getData = response.data;
+          if(getData.base64 !==undefined && getData.base64 !=="")
+          {
+              let resData = getData.base64;
+              let type = 0;
+              let DocBase = ""
+              // if(resData.formate !==null )
+              // {
+              //     if(resData.formate ==="application/pdf")
+              //     {
+              //         type=2;
+              //         DocBase = "data:application/pdf;base64,"+resData.base64.base64;
+              //     }else{
+              //         type=1;
+              //         DocBase = "data:image/jpg;base64,"+resData.base64.base64;
+              //     }
+                  
+              // }
+              DocBase = "data:image/jpg;base64,"+resData.base64;
+              this.setState({
+                  //panFileType: type,
+                  panBase: DocBase,
+                  //panType: resData.formate,
+                  //panId: resData.id
+              });
+          }
+      }
+  });
+
+  this.props.dispatch(getLeadOtherDocuemnt(proData)).then((response)=>{
+    if(response.status ==="success")
+    {
+        let getData = response;
+        if(getData.aadharfrontdata !==undefined && getData.aadharfrontdata !=="")
+        {
+            let resData = getData.aadharfrontdata.base64;
+            let type = 0;
+            let DocBase = ""
+            if(resData)
+            {
+                // if(resData.formate ==="application/pdf")
+                // {
+                //     type=2;
+                //     DocBase = "data:application/pdf;base64,"+resData.base;
+                // }else{
+                //     type=1;
+                //     DocBase = "data:image/jpg;base64,"+resData.base;
+                // }
+                DocBase = "data:image/jpg;base64,"+resData.base64;
+            }
+            this.setState({
+                frontFileType: type,
+                frontAadharProofBase: DocBase,
+                selectedTab: 1,
+                defaultTab: 1,
+                //frontProofType: resData.formate?resData.formate:'',
+                //frontId: resData.id
+            });
+        }
+        if(getData.driving !==undefined && getData.driving !=="")
+        {
+            let resData = getData.driving.base64;
+            let type = 0;
+            let DocBase = ""
+            if(resData)
+            {
+                // if(resData.formate ==="application/pdf")
+                // {
+                //     type=2;
+                //     DocBase = "data:application/pdf;base64,"+resData.base;
+                // }else{
+                //     type=1;
+                //     DocBase = "data:image/jpg;base64,"+resData.base;
+                // }
+                DocBase = "data:image/jpg;base64,"+resData.base64;
+            }
+            this.setState({
+                frontFileType: type,
+                frontDrivingProofBase: DocBase,
+                selectedTab: 2,
+                defaultTab: 2,
+                //frontProofType: resData.formate?resData.formate:'',
+                //frontId: resData.id
+            });
+        }
+        if(getData.voterfrontdata !==undefined && getData.voterfrontdata !=="")
+        {
+            let resData = getData.voterfrontdata.base64;
+            let type = 0;
+            let DocBase = ""
+            if(resData)
+            {
+                // if(resData.formate ==="application/pdf")
+                // {
+                //     type=2;
+                //     DocBase = "data:application/pdf;base64,"+resData.base;
+                // }else{
+                //     type=1;
+                //     DocBase = "data:image/jpg;base64,"+resData.base;
+                // }
+                DocBase = "data:image/jpg;base64,"+resData.base64;
+            }
+          
+            this.setState({
+                frontFileType: type,
+                frontVoterProofBase: DocBase,
+                selectedTab: 3,
+                defaultTab: 3,
+                //frontProofType: resData.formate?resData.formate:'',
+                //frontId: resData.id
+            });
+        }
+        if(getData.passport !==undefined && getData.passport !=="")
+        {
+            let resData = getData.passport.base64;
+            let type = 0;
+            let DocBase = ""
+            if(resData)
+            {
+                // if(resData.formate ==="application/pdf")
+                // {
+                //     type=2;
+                //     DocBase = "data:application/pdf;base64,"+resData.base;
+                // }else{
+                //     type=1;
+                //     DocBase = "data:image/jpg;base64,"+resData.base;
+                // }
+                DocBase = "data:image/jpg;base64,"+resData.base64;
+            }
+            this.setState({
+                frontFileType: type,
+                frontPassportProofBase: DocBase,
+                selectedTab: 4,
+                defaultTab: 4,
+                //frontProofType: resData.formate?resData.formate:'',
+                //frontId: resData.id
+            });
+        }
+
+        if(getData.aadharbackdata !==undefined && getData.aadharbackdata !=="")
+        {
+            let resData = getData.aadharbackdata.base64;
+            let type = 0;
+            let DocBase = ""
+            if(resData)
+            {
+                // if(resData.formate ==="application/pdf")
+                // {
+                //     type=2;
+                //     DocBase = "data:application/pdf;base64,"+resData.base;
+                // }else{
+                //     type=1;
+                //     DocBase = "data:image/jpg;base64,"+resData.base;
+                // }
+                DocBase = "data:image/jpg;base64,"+resData.base64;
+            }
+            this.setState({
+                backFileType: type,
+                backAadharProofBase: DocBase,
+                selectedTab: 1,
+                defaultTab: 1,
+               // backProofType: resData.formate?resData.formate:'',
+                //backId: resData.id
+            });
+        }
+        if(getData.driving !==undefined && getData.driving !=="")
+        {
+            let resData = getData.driving.base64;
+            let type = 0;
+            let DocBase = ""
+            if(resData)
+            {
+                // if(resData.formate ==="application/pdf")
+                // {
+                //     type=2;
+                //     DocBase = "data:application/pdf;base64,"+resData.base;
+                // }else{
+                //     type=1;
+                //     DocBase = "data:image/jpg;base64,"+resData.base;
+                // }
+                DocBase = "data:image/jpg;base64,"+resData.base64;
+            }
+            this.setState({
+                backDrivingProofBase: DocBase,
+                backFileType: type,
+                selectedTab: 2,
+                defaultTab: 2,
+                //backProofType: resData.formate?resData.formate:'',
+                //backId: resData.id
+            });
+        }
+        if(getData.voterbackdata !==undefined && getData.voterbackdata !=="")
+        {
+            let resData = getData.voterbackdata.base64;
+            let type = 0;
+            let DocBase = ""
+            if(resData)
+            {
+                // if(resData.formate ==="application/pdf")
+                // {
+                //     type=2;
+                //     DocBase = "data:application/pdf;base64,"+resData.base;
+                // }else{
+                //     type=1;
+                //     DocBase = "data:image/jpg;base64,"+resData.base;
+                // }
+                DocBase = "data:image/jpg;base64,"+resData.base64;
+            }
+            this.setState({
+                backFileType: type,
+                backVoterProofBase: DocBase,
+                selectedTab: 3,
+                defaultTab: 3,
+               // backProofType: resData.formate?resData.formate:'',
+               // backId: resData.id
+            });
+        }
+        if(getData.passport !==undefined && getData.passport !=="")
+        {
+            let resData = getData.passport.base64;
+            let type = 0;
+            let DocBase = ""
+            if(resData)
+            {
+                // if(resData.formate ==="application/pdf")
+                // {
+                //     type=2;
+                //     DocBase = "data:application/pdf;base64,"+resData.base;
+                // }else{
+                //     type=1;
+                //     DocBase = "data:image/jpg;base64,"+resData.base;
+                // }
+                DocBase = "data:image/jpg;base64,"+resData.base64;
+            }
+            this.setState({
+                backFileType: type,
+                backPassportProofBase: DocBase,
+                selectedTab: 4,
+                defaultTab: 4,
+                //backProofType: resData.formate?resData.formate:'',
+                //backId: resData.id
+            });
+        }
+      }
+    });
+    
+  }
+
+    kycDocumentsDownload = () =>{
+        if(this.state.panBase)
+        {
+          this.downloadKyc(this.state.panBase);
+        }
+        if(this.state.profileBase)
+        {
+          this.downloadKyc(this.state.profileBase);
+        }
+        if(this.state.frontAadharProofBase)
+        {
+          this.downloadKyc(this.state.frontAadharProofBase);
+        }
+        if(this.state.backAadharProofBase)
+        {
+          this.downloadKyc(this.state.backAadharProofBase);
+        }
+        if(this.state.frontDrivingProofBase)
+        {
+          this.downloadKyc(this.state.frontDrivingProofBase);
+        }
+        if(this.state.backDrivingProofBase)
+        {
+          this.downloadKyc(this.state.backDrivingProofBase);
+        }
+        if(this.state.frontPassportProofBase)
+        {
+          this.downloadKyc(this.state.frontPassportProofBase);
+        }
+        if(this.state.backPassportProofBase)
+        {
+          this.downloadKyc(this.state.backPassportProofBase);
+        }
+        if(this.state.frontVoterProofBase)
+        {
+          this.downloadKyc(this.state.frontVoterProofBase);
+        }
+        if(this.state.backVoterProofBase)
+        {
+          this.downloadKyc(this.state.backVoterProofBase);
+        }
+    }
+
+    downloadKyc(imgSrc) {
+        const linkSource = `${imgSrc}`;
+        const downloadLink = document.createElement("a");
+        const fileName = "image.jpeg";
+        downloadLink.href = linkSource;
+        downloadLink.download = fileName;
+        downloadLink.click();
+    }
+
+    handleApprpveModel = (value) =>{
+      this.setState({approve_model: value})
+    }
+
+    handleDeclineModel = (value) =>{
+      this.setState({decline_model: value})
+    }
+
+    handleApprovedModel = (value) =>{
+      this.setState({approved_model: value, approve_model: false});
+      setTimeout(() => {  
+        this.setState({approved_model: false});
+      }, 3000); 
+    }
+
+  render() {
+    const { isLoggedIn, message, lead_id, lead_profile, salesForceToken, user_id } = this.props;
+    const { approve_model, decline_model, approved_model } = this.state
+    if(!user_id){
+      return <Redirect to="/login" />
+   }
+    const { selectedTab, addressList } = this.state
+    return (
+      <>
+      <Helmet>
+        <title>Lead - Details </title>
+      </Helmet>
+<div id="wrapper">
+<Sidebar />
+    <div id="content-wrapper" className="d-flex flex-column">
+      
+        <div className="container-fluid lead_details_header">
+          <div className="row align-items-center">
+            <div className="col-md-6">
+            <a href="/approvalPending"> <div className="backicon float-left"><img src="img/icon_back.svg" /></div></a>
+             <div className="d-flex">
+                                <div className="pr_img">
+                                <img className="img-profile rounded-circle" src="img/undraw_profile.svg" />
+                                </div>
+                                <div className="pr_texts">
+                                <h5 className="d-block">{this.state.sfid} <span>Approval Pending</span></h5>
+                                <p>{this.state.firstname} {this.state.lastname}<span className="mailid"><img src="img/icon_mail.svg" />{this.state.email}</span><span className="contactnum"><img src="img/icon_call.svg" /> {this.state.mobile}</span></p>
+                                </div>
+                                </div>
+            </div>
+            <div className="col-md-3">
+                <form action="" className="search-form nav_search">
+                    <div className="form-group has-feedback">
+                     <label htmlFor="search" className="sr-only">Search</label>
+                     <input type="text" className="form-control" name="search" id="search" placeholder="Find Cases, Users" />
+                  </div>
+               </form>
+            </div>
+            <div className="col-md-3 text-right">
+              <ul className="topicon_lists">
+                <li>
+                  <a href="#">
+                    <img src="images/ques.svg" />
+                  </a>
+                </li>
+                <li>
+                  <a href="#">
+                    <img src="images/messages.svg" />
+                  </a>
+                </li>
+                <li>
+                  <a href="#" onClick={this.generatePDF}>
+                    <img src="images/download.svg" />
+                  </a>
+                </li>
+              </ul>
+            </div>
+            <div className="col-md-12">
+            <div className="row mt-3">
+            <div className="col-md-8">
+            <div className="backicon float-left visibility-hidden"><img src="img/icon_back.svg" /></div>
+              <nav className="float-left">
+  <div className="nav nav-tabs" id="nav-tab" role="tablist">
+    <a
+      className="nav-item nav-link active"
+      id="nav-appdetails-tab"
+      data-toggle="tab"
+      href="#nav-appdetails"
+      role="tab"
+      aria-controls="nav-appdetails"
+      aria-selected="true"
+    >
+      Application Details
+    </a>
+    <a
+      className="nav-item nav-link"
+      id="nav-documents-tab"
+      data-toggle="tab"
+      href="#nav-documents"
+      role="tab"
+      aria-controls="nav-documents"
+      aria-selected="false"
+    >
+      Documents
+    </a>
+  </div>
+</nav>
+  </div>
+  <div className="col-md-4 text-right tbuttons">
+      <button type="button" className="btn btn-dark mr-4" onClick={ () => this.handleApprpveModel(true)}><img src="img/icon_approve.svg" /> Approve</button>
+      <button type="button" className="btn btn-primary" onClick={ () => this.handleDeclineModel(true)} ><img src="img/icon_declare.svg" /> Decline</button>
+  </div>
+    </div>
+
+            </div>
+          </div>
+        </div>
+        <div id="content">
+
+        <div className="container-fluid">
+          <div className="row">
+            <div className="col-md-12 pt-2">
+  <div className="card">
+         <div className="card-body">
+            <div className="tab-content" id="nav-tabContent">     
+  <div
+    className="tab-pane fade active show"
+    id="nav-appdetails"
+    role="tabpanel"
+    aria-labelledby="nav-appdetails-tab"
+  >
+  <div className="row">  
+    <div className="col-md-3">
+      <div className="whiteboxed">
+        <h6>Financial Borrower Details </h6>
+        <h4>{this.state.firstname} {this.state.lastname}</h4>
+        <div className="personinfo">Male <span className="dob"> {this.state.dob}</span><span className="maritalstatus">Married</span></div>
+        <ul className="prooflist">
+        <li className="card">
+        PAN Number
+        <a href="#">{this.state.pan}</a>
+        </li>
+        <li className="aadhaar">
+        Aadhar Number
+        <a href="#">XXXXXXXX7859</a>
+        </li>
+        <li className="card">
+        PAN Driving License
+        <a href="#">MH1285345193</a>
+        </li>
+        </ul>
+        <h4>Income Details</h4>
+        <div className="personinfo">Salaried <span className="profession"> Private Sector</span><span className="companydetails">{this.state.company_name}</span></div>
+        <ul className="prooflist">
+        <li className="wallet">
+        Monthly Income
+        <span>₹ {this.state.monthly_income}</span>
+        </li>
+        <li className="stmt">
+        Bank Statement
+        <a href="#">6 Months</a>
+        </li>
+        <li className="doc">
+        Salary Slips
+        <a href="#">6 Months</a>
+        </li>
+        </ul>
+      </div>
+    </div>
+    <div className="col-md-5">
+    <div className="whiteboxed">
+        <h6>Product Plan Details</h6>
+        <div className="row">
+          <div className="col-md-7">
+            <h4>Post Graduation in Business Management <span>(Tenure- {this.state.net_tenure} Months)</span></h4>
+          </div>
+          <div className="col-md-5">
+              <div className="d-flex">
+                <div className="col-md-6 pl-0 pr-0">
+                <h5 className="s1">FOIR post Eduvanz EMI</h5></div>
+                <div className="">
+                <div style={{ width: 80, height: 80 }}>
+                <CircularProgressbar
+                  value={percentage}
+                  text={`${percentage}%`}
+                  styles={buildStyles({
+                    textColor: "#4BCA81",
+                    pathColor: "#4BCA81",
+                    trailColor: "#d0cecd"
+                  })}
+                />
+                </div>
+                </div>
+              </div>
+          </div>
+        </div>
+        <div className="table-responsive">
+          <table className="billed" cellSpacing="0" cellPadding="0">
+            <tbody>
+            <tr>
+              <td><img src="img/icon_bank.svg" /></td>
+              <td>Loan Amount</td>
+              <td className="text-right"><b>₹ 70,000</b></td>
+            </tr>
+            <tr>
+              <td></td>
+              <td><span>Upfront Amount</span><img src="img/icon_iicon.svg" /></td>
+              <td className="text-right">₹ {this.state.upfront_amount}</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td><span>Monthly Amount </span><span className="d-block">( from {this.state.loan_startdate} )</span></td>
+              <td className="text-right">₹ {this.state.emi_amount}</td>
+            </tr>
+            <tr>
+              <td><img src="img/icon_money.svg" /></td>
+              <td>Total Payable <span>(APR {this.state.interest_rate}%)</span> <img src="img/icon_iicon.svg" /> </td>
+              <td className="text-right"><b>₹ 70,000</b></td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="d-block full_border"></div>
+        <h4>{this.state.moratorium_type} <span>( {this.state.moratorium_duration} months )</span></h4>
+        <ul className="timeliner">
+          <li className="started w40"><span>Nov 21</span>₹ 500 <label>per month</label></li>
+          <li className="inProgress w60"><span>Jan 21</span>₹ 17,000 <label>per month</label></li>
+          <li className="completed"><span>May 21</span></li>
+        </ul>
+      </div>
+    </div>
+    <div className="col-md-4">
+    <div className="whiteboxed">
+      <h6>Residential Stability</h6>
+        <h4>Addresses</h4>
+        <ul className="Addresses mt-3">
+        <h5>Permanent Address</h5>
+        { addressList && addressList.length > 0 &&
+                                    (
+                                     addressList.map((item, index) =>(
+          <li key={index}>
+          <p>{`${item.address__c}, ${item.pincode__c}`}</p>
+          <button className="btn btn-small">{this.state.resident_type}</button>
+          </li>
+            ))
+            )
+          }
+            <h5>Current Address</h5>
+          <li>
+          <p>{this.state.selectedAddress.address__c} {this.state.selectedAddress.city__c} {this.state.selectedAddress.state__c} {this.state.selectedAddress.country__c}  {this.state.selectedAddress.pincode__c}</p>
+          <button className="btn btn-small">{this.state.resident_type}</button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div className="row mt-5 mb-2">  
+      <div className="col-md-12">
+      <div className="whiteboxed">
+      <div className="row">
+        <div className="col-md-2">
+        <h6>Credit Factors</h6>
+        <h4>Bureau Details</h4>
+        <div className="mt-4 position-relative">
+        <div class="clock">
+            <div class="handel" style={this.state.Ifdata ?  {"transform": "rotate(" + (300 / 900) * 782 + "deg)"} 
+            : {"transform": "rotate(60deg)"}}></div>
+            <div class="amount-counter">
+                <h2 className="mb-2">{this.state.Ifdata ? 782 : 300}</h2>
+                <p>BUREAU SCORE</p>
+            </div>
+        </div>
+          <div className="min-score">300</div>
+          <div className="max-score">900</div>
+        </div>
+        </div>
+        <div className="col-md-10">
+            <nav className="float-left">
+  <div className="nav nav-tabs" id="nav-tab" role="tablist">
+    <a
+      className="nav-item nav-link active"
+      id="nav-bureau-tab"
+      data-toggle="tab"
+      href="#nav-bureau"
+      role="tab"
+      aria-controls="nav-bureau"
+      aria-selected="true"
+    >
+      Bureau Analysis
+    </a>
+    <a
+      className="nav-item nav-link"
+      id="nav-liabilities-tab"
+      data-toggle="tab"
+      href="#nav-liabilities"
+      role="tab"
+      aria-controls="nav-liabilities"
+      aria-selected="false"
+    >
+      Bureau Liabilities
+    </a>
+  </div>
+</nav>
+        </div>
+        </div>
+
+          <div className="row">
+            <div className="col-md-12 pt-2">
+  <div className="card">
+         <div className="card-body">
+            <div className="tab-content" id="nav-tabContent-1">     
+  <div
+    className="tab-pane fade active show"
+    id="nav-bureau"
+    role="tabpanel"
+    aria-labelledby="nav-bureau-tab"
+  >
+<div className="row">
+<div className="col-md-2">
+  <div className="">Add credit score js</div>
+        <ul className="listhwithcounts">
+          <li>Bank Accounts<span>05</span></li>
+          <li>Overdues<span>01</span></li>
+          <li>0 Balance Ac<span>01</span></li>
+        </ul>
+        </div>
+        <div className="col-md-10">
+        <h5 className="s2">Hard Pull Experian <a href="#">View Report</a></h5>
+        <h6 className="s1">Borrower's Bureau Analysis <span>Refreshed on: 12th Dec 2021, 11AM</span></h6>
+            <div className="row">
+            <div className="col-md-6">
+                <ul className="listhwithcounts right_border">
+          <li>No. of Tradelines with 30+ DPD in last 3 months<span>0</span></li>
+          <li>No. of Tradelines with 0+ DPD in last 12 months<span>8</span></li>
+          <li>{'No. of Tradelines with Overdue Amount > 0'}<span>8</span></li>
+          <li>No. of tradelines with Wilful Default/Settlement/Suit Filed/SMA/LSS/DBT Accounts <span>8</span></li>
+        </ul>
+            </div>
+            <div className="col-md-6">
+                <ul className="listhwithcounts">
+          <li>No. of Tradelines with 90+ DPD in last 12 months <span>0</span></li>
+          <li>No. of Tradelines with 0+ DPD in last 3 months <span>0</span></li>
+          <li>{'No. of Tradelines with Overdue Amount > 5000'}<span>0</span></li>
+          <li>Age in bureau (in months) <span>0</span></li>
+        </ul>
+            </div>
+            </div>
+        </div>
+        </div>
+    </div>
+    <div
+    className="tab-pane fade"
+    id="nav-liabilities"
+    role="tabpanel"
+    aria-labelledby="nav-liabilities-tab"
+  >
+  <div className="table-responsive">
+          <table className="liabilities" cellSpacing="0" cellPadding="0">
+            <thead>
+            <tr>
+              <th>Active Tradelines</th>
+              <th>Tradelines</th>
+              <th>O/s Balance</th>
+              <th>EMI in Bureau</th>
+              <th>Imputed EMI</th>
+              <th>Obligated EMI</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+              <td>Gold Loan</td>
+              <td>1</td>
+              <td>₹ 45 000</td>
+              <td>₹ 5 000</td>
+              <td>₹ 5 000</td>
+              <td>₹ 5 000</td>
+            </tr>
+            <tr>
+              <td>Education Loan</td>
+              <td>3</td>
+              <td>₹ 35 000</td>
+              <td>₹ 7 000</td>
+              <td>₹ 7 000</td>
+              <td>₹ 7 000</td>
+            </tr>
+            <tr>
+              <th>Total</th>
+              <th>4</th>
+              <th>₹ 70 000</th>
+              <th>₹ 12 000</th>
+              <th>₹ 12 000</th>
+              <th>₹ 12 000</th>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        
+
+    </div>
+    </div>
+    </div>
+    </div>
+    </div>
+    </div>
+
+      </div>
+    </div>
+  </div>
+  </div>
+  <div
+    className="tab-pane fade"
+    id="nav-documents"
+    role="tabpanel"
+    aria-labelledby="nav-documents-tab"
+  >
+  <div className="d-block pt-3 pb-2 pr-3 pl-3">
+   <div className="row">
+   <div className="col-md-3"> 
+  <ul className="nav nav-tabs" id="verticaltab" role="tablist">
+    <li className="nav-item">
+      <a
+        className="nav-link active"
+        data-toggle="tab"
+        href="#kyc"
+        role="tab"
+        aria-controls="kyc"
+      >
+        KYC Documents (05) <a onClick={this.kycDocumentsDownload}><img src="images/download.svg"/></a>
+      </a>
+    </li>
+    <li className="nav-item">
+      <a
+        className="nav-link"
+        data-toggle="tab"
+        href="#bdocument"
+        role="tab"
+        aria-controls="bdocument"
+      >
+        Bureau Document (01) <img src="images/download.svg"/>
+      </a>
+    </li>
+    <li className="nav-item">
+      <a
+        className="nav-link"
+        data-toggle="tab"
+        href="#fstatements"
+        role="tab"
+        aria-controls="fstatements"
+      >
+        Financial Statements (02) <img src="images/download.svg"/>
+      </a>
+    </li>
+    <li className="nav-item">
+      <a
+        className="nav-link"
+        data-toggle="tab"
+        href="#aproofs"
+        role="tab"
+        aria-controls="aproofs"
+      >
+        Address Proofs (01) <img src="images/download.svg"/>
+      </a>
+    </li>
+    <li className="nav-item">
+      <a
+        className="nav-link"
+        data-toggle="tab"
+        href="#odocuments"
+        role="tab"
+        aria-controls="odocuments"
+      >
+        Other Documents (01) <img src="images/download.svg"/>
+      </a>
+    </li>
+  </ul>
+  <div className="row">
+  <div className="col-md-12 text-right tbuttons">
+    <button className="btn btn-primary btn-s1"><img src="images/download.svg"/>Download All</button>
+    </div>
+    </div>
+  </div>
+  <div className="col-md-9"> 
+  <div className="tab-content">
+    <div className="tab-pane active" id="kyc" role="tabpanel">
+        <h3 className="mb-3">KYC Documents</h3>
+        <div className="row">
+          <div className="col-md-6 isdownload">
+          {this.state.panBase?(
+            <><h6>Pan Card  <a href={this.state.panBase} download={"image.jpeg"}><img src="images/download.svg" /></a></h6><div className="docimgs" onClick={() => this.setDocument(this.state.panBase, 'Pan Card')} data-toggle="modal" data-target="#docModel">
+
+                                              <img src={this.state.panBase} />
+                                            </div></>
+            ):
+            <><h6>Pan Card <img src="images/download.svg" /></h6><div className="docimgs">
+
+                                              <img src="" />
+                                            </div></>
+          
+            }
+          </div>
+          <div className="col-md-6 isdownload">
+          {this.state.profileBase?(
+              <><h6>Photo <a href={this.state.profileBase} download={"image.jpeg"}><img src="images/download.svg" /></a></h6><div className="docimgs" onClick={() => this.setDocument(this.state.profileBase, 'Profile Photo')} data-toggle="modal" data-target="#docModel">
+
+                                              <img src={this.state.profileBase} />
+                                            </div></>
+            ):
+            <><h6>Photo <img src="images/download.svg" /></h6><div className="docimgs">
+
+            <img src="" />
+          </div></>
+
+            }
+           
+          </div>
+        </div>
+
+        <div className="row">
+          <div className="col-md-6 isdownload">
+          {this.state.frontAadharProofBase?(
+            <><h6>Aadhar Card <span>Front View <a href={this.state.frontAadharProofBase} download={"image.jpeg"}><img src="images/download.svg" /></a></span></h6><div className="docimgs" onClick={() => this.setDocument(this.state.frontAadharProofBase, 'Aadhaar Front')} data-toggle="modal" data-target="#docModel">
+
+                                              <img src={this.state.frontAadharProofBase} />
+                                            </div></>
+            ):
+              <><h6>Aadhar Card <span>Front View <img src="images/download.svg" /></span></h6><div className="docimgs">
+
+              <img src="" />
+            </div></>
+            }
+           
+          </div>
+          <div className="col-md-6 isdownload">
+          {this.state.backAadharProofBase?(
+              <><h6><span>Back View <a href={this.state.backAadharProofBase} download={"image.jpeg"}><img src="images/download.svg" /></a></span></h6><div className="docimgs" onClick={() => this.setDocument(this.state.backAadharProofBase, 'Aadhaar Back')} data-toggle="modal" data-target="#docModel">
+
+                                              <img src={this.state.backAadharProofBase} />
+                                            </div></>
+            ):
+            <><h6>Back View <img src="images/download.svg" /></h6><div className="docimgs">
+
+            <img src="" />
+          </div></>
+            }
+           
+          </div>
+        </div>
+
+        <div className="row">
+          <div className="col-md-6 isdownload">
+          {this.state.frontDrivingProofBase?(
+            <><h6>Driving Licence <span>Front View <a href={this.state.frontDrivingProofBase} download={"image.jpeg"}><img src="images/download.svg" /></a></span></h6><div className="docimgs" onClick={() => this.setDocument(this.state.frontDrivingProofBase, 'Driving License Front')} data-toggle="modal" data-target="#docModel">
+
+                                              <img src={this.state.frontDrivingProofBase} />
+                                            </div></>
+            ):
+            <><h6>Driving Licence <span>Front View <img src="images/download.svg" /></span></h6><div className="docimgs">
+
+            <img src="" />
+          </div></>
+            }
+          
+          </div>
+          <div className="col-md-6 isdownload">
+          {this.state.backDrivingProofBase?(
+              <><h6><span>Back View <a href={this.state.backDrivingProofBase} download={"image.jpeg"}><img src="images/download.svg" /></a></span></h6><div className="docimgs" onClick={() => this.setDocument(this.state.backDrivingProofBase, 'Driving License Back')} data-toggle="modal" data-target="#docModel">
+
+                                              <img src={this.state.backDrivingProofBase} />
+                                            </div></>
+            ):
+            <><h6>Back View <img src="images/download.svg" /></h6><div className="docimgs">
+
+            <img src="" />
+          </div></>
+            }
+         
+          </div>
+        </div>
+
+        <div className="row">
+          <div className="col-md-6 isdownload">
+          {this.state.frontPassportProofBase?(
+            <><h6>Passport <span>Front View <a href={this.state.frontPassportProofBase} download={"image.jpeg"}><img src="images/download.svg" /></a></span></h6><div className="docimgs" onClick={() => this.setDocument(this.state.frontPassportProofBase, 'Passport Front')} data-toggle="modal" data-target="#docModel">
+
+                                              <img src={this.state.frontPassportProofBase} />
+                                            </div></>
+            ):
+            <><h6>Passport <span>Front View <img src="images/download.svg" /></span></h6><div className="docimgs">
+
+            <img src="" />
+          </div></>
+            }
+        
+          </div>
+          <div className="col-md-6 isdownload">
+          {this.state.backPassportProofBase?(
+              <><h6><span>Back View <a href={this.state.backPassportProofBase} download={"image.jpeg"}><img src="images/download.svg" /></a></span></h6><div className="docimgs" onClick={() => this.setDocument(this.state.backPassportProofBase, 'Passport Back')} data-toggle="modal" data-target="#docModel">
+
+                                              <img src={this.state.backPassportProofBase} />
+                                            </div></>
+            ):
+            <><h6>Back View <img src="images/download.svg" /></h6><div className="docimgs">
+
+            <img src="" />
+          </div></>
+            }
+           
+          </div>
+        </div>
+
+        <div className="row">
+          <div className="col-md-6 isdownload">
+          {this.state.frontVoterProofBase?(
+            <><h6>Voter id <span>Front View <a href={this.state.frontVoterProofBase} download={"image.jpeg"}><img src="images/download.svg" /></a></span></h6><div className="docimgs" onClick={() => this.setDocument(this.state.frontVoterProofBase, 'Voter Id Front')} data-toggle="modal" data-target="#docModel">
+
+                                              <img src={this.state.frontVoterProofBase} />
+                                            </div></>
+            ):
+            <><h6>Voter id <span>Front View <img src="images/download.svg" /></span></h6><div className="docimgs">
+
+            <img src="" />
+          </div></>
+            }
+          
+          </div>
+          <div className="col-md-6 isdownload">
+          {this.state.backVoterProofBase?(
+              <><h6><span>Back View <a href={this.state.backVoterProofBase} download={"image.jpeg"}><img src="images/download.svg" /></a></span></h6><div className="docimgs" onClick={() => this.setDocument(this.state.backVoterProofBase, 'Voter Id Back')} data-toggle="modal" data-target="#docModel">
+
+                                              <img src={this.state.backVoterProofBase} />
+                                            </div></>
+            ):
+            <><h6>Back View <img src="images/download.svg" /></h6><div className="docimgs">
+
+            <img src="" />
+          </div></>
+            }
+           
+          </div>
+        </div>
+
+
+    </div>
+    <div className="tab-pane" id="bdocument" role="tabpanel">
+      
+      <h3 className="mb-3">Bureau Document</h3>
+        <div className="row">
+          <div className="col-md-12 isdownload">
+            <h6>Bureau Report <img src="images/download.svg"/></h6>
+            <div className="docimgs">
+                <img src="images/9.jpg"/>
+            </div>
+          </div>
+        </div>
+
+    </div>
+    <div className="tab-pane" id="fstatements" role="tabpanel">
+      
+      <h3 className="mb-3">Financial Statements</h3>
+        <div className="row">
+          <div className="col-md-12 isdownload">
+            <h6>Bank Statements <img src="images/download.svg"/></h6>
+            <div className="docimgs">
+                <img src="images/10.jpg"/>
+            </div>
+          </div>
+          <div className="col-md-12 isdownload">
+            <h6>Salary Slips <img src="images/download.svg"/></h6>
+            <div className="docimgs">
+                <img src="images/11.jpg"/>
+            </div>
+          </div>
+        </div>
+
+    </div>
+    <div className="tab-pane" id="aproofs" role="tabpanel">
+      
+      <h3 className="mb-3">Address Proofs</h3>
+        <div className="row">
+          <div className="col-md-6 isdownload">
+            <h6>Ration Card <img src="images/download.svg"/></h6>
+            <div className="docimgs">
+                <img src="images/12.jpg"/>
+            </div>
+          </div>
+        </div>
+
+    </div>
+    <div className="tab-pane" id="odocuments" role="tabpanel">
+        
+        <h3 className="mb-3">Other Documents</h3>
+        <div className="row">
+          <div className="col-md-6 isdownload">
+            <h6>CAM Report <img src="images/download.svg"/></h6>
+            <div className="docimgs">
+                <img src="images/13.jpg"/>
+            </div>
+          </div>
+        </div>
+
+    </div>
+  </div>
+
+  </div>
+  </div>
+ </div>
+
+
+
+
+  </div>
+    </div>
+      </div>
+        </div>
+        <div className="row">
+            <div className="col-md-12 text-right tbuttons pt-3 pb-3">
+      <button className="btn btn-primary mr-4"><img src="img/icon_pcase.svg" /> Previous Case</button>
+      <button className="btn btn-primary">Next Case <img className="alignedright" src="img/icon_ncase.svg" /></button>
+  </div>
+  </div>
+            </div>
+          </div>
+        </div>
+        {/* /.container-fluid */}
+      </div>
+      {/* End of Main Content */}
+    </div>
+    {/* End of Content Wrapper */}
+  </div>
+
+ 
+  <div
+    className="modal fade documentspopup"
+    id="docModel"
+    tabIndex={-1}
+    role="dialog"
+    aria-labelledby="exampleModalLabel"
+    aria-hidden="true"
+  >
+    <div className="modal-dialog" role="document">
+      <div className="modal-content">
+        <div className="modal-header">
+        <div className="d-flex col-md-12">
+        <div className="col-md-4">
+          <img src="img/icon_tick.svg" /> Verified by Eduvanz
+        </div>
+          <div className="col-md-4 text-center">
+            <h5><b>{this.state.modalTitle}</b></h5>
+          </div>
+          <div className="col-md-4">
+          <button
+            type="button"
+            className="close"
+            data-dismiss="modal"
+            aria-label="Close"
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+          </div>
+          </div>
+        </div>
+        <div className="modal-body">
+          <div className="row justify-content-center align-items-center">
+            <div className=" pt-5 pb-5 pl-5 pr-5">
+            <img src={this.state.showDocument} />
+            </div>
+            </div>
+        </div>
+        <div className="modal-footer">
+        <a href={this.state.showDocument} download={"image.jpeg"}>
+          <button className="btn btn-primary mr-4"><img src="img/icon_Download.svg" /> Download</button>
+          </a>
+          <button className="btn btn-primary mr-4"><img src="img/icon_pcase.svg" /> Previous</button>
+          <button className="btn btn-primary">Next <img className="alignedright" src="img/icon_ncase.svg" /></button>
+        </div>
+      </div>
+    </div>
+  </div>
+        {/* Approval Confirmation */}
+        <Modal show={approve_model} >
+        <div className="modal-body text-center">
+              <div className="d-inline-block">
+                  <div className="d-inline-block">
+                      <img src="images/process-anim1.png" className="img-fluid"></img> 
+                  </div>
+                  
+                  <h4 className="mt-5 mb-4">Are you sure you want to Approve Case ?</h4> 
+                  <button type="button" onClick={()=> this.handleApprovedModel(true)} className="btn-black w-100 mb-4"><h4>Approve Case</h4></button>
+                  <button type="button" onClick={()=> this.handleApprpveModel(false)} className="later">Later</button>
+              </div>                     
+          </div>
+        </Modal>
+         {/* Approved */}
+
+           {/* decline */}
+           <Modal show={decline_model} >
+           <div className="modal-body text-center">                   
+
+              <div className="d-inline-block">
+                  <div className="d-inline-block">
+                      <img src="images/decline2.png" className="img-fluid"></img> 
+                  </div>
+                  <h4 className="mt-5 mb-4">Are you sure you want to decline the case ?</h4>
+                  <div className="custom-select-style mb-3">
+                      <select>
+                          <option value="0">Select decline case reason*</option>
+                          <option value="1">Reason 1</option>
+                          <option value="2">Reason 1</option>
+                          <option value="3">Reason 1</option>
+                          <option value="4">Reason 1</option>
+                          <option value="5">Reason 1</option>
+                          <option value="6">Reason 1</option>
+                      </select>
+                      </div>
+                  <div>
+                      <textarea className="textarea2" placeholder="Mention the reason here *"/>
+                  </div>
+                  <div className="pt-5">
+                      <button className="btn-black w-100 mb-4"><h4>Decline Case</h4></button>
+                      <button type="button" onClick={() => this.handleDeclineModel(false)} className="later">Later</button>
+                  </div>
+              </div>
+
+
+              </div>
+        </Modal>
+
+        {/* Declined */}
+
+           {/* Approved */}
+           <Modal show={approved_model} >
+           <div className="modal-body text-center">
+              <div className="d-inline-block">
+                  <div className="d-inline-block">
+                      <img src="images/stamp.png" className="img-fluid"></img> 
+                  </div>
+                  
+                  <h4 className="mt-5 mb-4 success-msg">Case Approved Successfully!</h4>
+              </div>
+          </div>
+        </Modal>
+
+        {/* Approved */}
+      </>
+    );
+  }
+}
+
+function mapStateToProps(state) {
+  const { isLoggedIn, salesForceToken, user_id } = state.auth;
+  const { lead_id, lead_profile } = state.user;
+  const { message } = state.message;
+  return {
+    isLoggedIn,
+    message,
+    lead_id,
+    lead_profile,
+    salesForceToken,
+    user_id
+  };
+}
+
+export default connect(mapStateToProps)(LeadDetails);
